@@ -1,4 +1,4 @@
-# this program loads Census ACS data using basic, slow INSERTs 
+# this program loads Census ACS data using basic, slow INSERTs
 # run it with -h to see the command line options
 
 import time
@@ -15,14 +15,16 @@ Datafile = "filedoesnotexist"  # name of the data file to be loaded
 CreateDB = False  # indicates whether the DB table should be (re)-created
 Year = 2015
 
-def row2vals(row):
-	# handle the null vals
-	for key in row:
-		if not row[key]:
-			row[key] = 0
-		row['County'] = row['County'].replace('\'','')  # eliminate quotes within literals
 
-	ret = f"""
+def row2vals(row):
+    # handle the null vals
+    for key in row:
+        if not row[key]:
+            row[key] = 0
+        row['County'] = row['County'].replace(
+            '\'', '')  # eliminate quotes within literals
+
+    ret = f"""
        {Year},                          -- Year
        {row['CensusTract']},            -- CensusTract
        '{row['State']}',                -- State
@@ -62,67 +64,75 @@ def row2vals(row):
        {row['FamilyWork']},             -- FamilyWork
        {row['Unemployment']}            -- Unemployment
 	"""
-	return ret
+    return ret
 
 
 def initialize():
-  global Year
+    global Year
 
-  parser = argparse.ArgumentParser()
-  parser.add_argument("-d", "--datafile", required=True)
-  parser.add_argument("-c", "--createtable", action="store_true")
-  parser.add_argument("-y", "--year", default=Year)
-  args = parser.parse_args()
+    parser = argparse.ArgumentParser()
+    parser.add_argument("-d", "--datafile", required=True)
+    parser.add_argument("-c", "--createtable", action="store_true")
+    parser.add_argument("-y", "--year", default=Year)
+    args = parser.parse_args()
 
-  global Datafile
-  Datafile = args.datafile
-  global CreateDB
-  CreateDB = args.createtable
-  Year = args.year
+    global Datafile
+    Datafile = args.datafile
+    global CreateDB
+    CreateDB = args.createtable
+    Year = args.year
 
 # read the input data file into a list of row strings
 # skip the header row
+
+
 def readdata(fname):
-	print(f"readdata: reading from File: {fname}")
-	with open(fname, mode="r") as fil:
-		dr = csv.DictReader(fil)
-		headerRow = next(dr)
-		# print(f"Header: {headerRow}")
+    print(f"readdata: reading from File: {fname}")
+    with open(fname, mode="r") as fil:
+        dr = csv.DictReader(fil)
+        headerRow = next(dr)
+        # print(f"Header: {headerRow}")
 
-		rowlist = []
-		for row in dr:
-			rowlist.append(row)
+        rowlist = []
+        for row in dr:
+            rowlist.append(row)
 
-	return rowlist
+    return rowlist
 
 # convert list of data rows into list of SQL 'INSERT INTO ...' commands
+
+
 def getSQLcmnds(rowlist):
-	cmdlist = []
-	for row in rowlist:
-		valstr = row2vals(row)
-		cmd = f"INSERT INTO {TableName} VALUES ({valstr});"
-		cmdlist.append(cmd)
-	return cmdlist
+    cmdlist = []
+    for row in rowlist:
+        valstr = row2vals(row)
+        cmd = f"INSERT INTO {TableName} VALUES ({valstr});"
+        cmdlist.append(cmd)
+    return cmdlist
 
 # connect to the database
+
+
 def dbconnect():
-	connection = psycopg2.connect(
+    connection = psycopg2.connect(
         host="localhost",
         database=DBname,
         user=DBuser,
         password=DBpwd,
-	)
-	connection.autocommit = True
-	return connection
+    )
+    connection.autocommit = True
+    return connection
 
-# create the target table 
+# create the target table
 # assumes that conn is a valid, open connection to a Postgres database
+
+
 def createTable(conn):
 
-	with conn.cursor() as cursor:
-		cursor.execute(f"""
+    with conn.cursor() as cursor:
+        cursor.execute(f"""
         	DROP TABLE IF EXISTS {TableName};
-        	CREATE UNLOGGED TABLE {TableName} (
+        	CREATE TEMP TABLE {TableName} (
             	Year                INTEGER,
               CensusTract         NUMERIC,
             	State               TEXT,
@@ -162,22 +172,26 @@ def createTable(conn):
             	FamilyWork          DECIMAL,
             	Unemployment        DECIMAL
          	);	
+                ALTER TABLE {TableName} ADD PRIMARY KEY (Year, CensusTract);
+         	CREATE INDEX idx_{TableName}_State ON {TableName}(State);
+                CREATE TABLE not_temp (LIKE {TableName} INCLUDING ALL);
     	""")
 
-		print(f"Created {TableName}")
+        print(f"Created {TableName}")
+
 
 def load(conn, icmdlist):
 
-	with conn.cursor() as cursor:
-		print(f"Loading {len(icmdlist)} rows")
-		start = time.perf_counter()
-    
-		for cmd in icmdlist:
-			# print (cmd)
-			cursor.execute(cmd)
+    with conn.cursor() as cursor:
+        print(f"Loading {len(icmdlist)} rows")
+        start = time.perf_counter()
 
-		elapsed = time.perf_counter() - start
-		print(f'Finished Loading. Elapsed Time: {elapsed:0.4} seconds')
+        for cmd in icmdlist:
+            # print (cmd)
+            cursor.execute(cmd)
+        cursor.execute(f'INSERT INTO not_temp SELECT * FROM {TableName};')
+        elapsed = time.perf_counter() - start
+        print(f'Finished Loading. Elapsed Time: {elapsed:0.4} seconds')
 
 
 def main():
@@ -187,13 +201,10 @@ def main():
     cmdlist = getSQLcmnds(rlis)
 
     if CreateDB:
-    	createTable(conn)
+        createTable(conn)
 
     load(conn, cmdlist)
 
 
 if __name__ == "__main__":
     main()
-
-
-
