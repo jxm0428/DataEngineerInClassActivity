@@ -10,7 +10,7 @@ import csv
 DBname = "data_storage_activity_database"
 DBuser = "jiang6"
 DBpwd = "jxm19970428"
-TableName = 'CensusData'
+TableName = 'CensusData_unlogged'
 Datafile = "filedoesnotexist"  # name of the data file to be loaded
 CreateDB = False  # indicates whether the DB table should be (re)-created
 Year = 2015
@@ -112,7 +112,7 @@ def dbconnect():
         user=DBuser,
         password=DBpwd,
 	)
-	connection.autocommit = True
+	connection.autocommit = False
 	return connection
 
 # create the target table 
