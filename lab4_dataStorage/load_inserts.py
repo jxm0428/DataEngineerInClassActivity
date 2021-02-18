@@ -10,7 +10,7 @@ import csv
 DBname = "data_storage_activity_database"
 DBuser = "jiang6"
 DBpwd = "jxm19970428"
-TableName = 'CensusData_unlogged'
+TableName = 'CensusData'
 Datafile = "filedoesnotexist"  # name of the data file to be loaded
 CreateDB = False  # indicates whether the DB table should be (re)-created
 Year = 2015
@@ -112,7 +112,7 @@ def dbconnect():
         user=DBuser,
         password=DBpwd,
 	)
-	connection.autocommit = False
+	connection.autocommit = True
 	return connection
 
 # create the target table 
@@ -122,7 +122,7 @@ def createTable(conn):
 	with conn.cursor() as cursor:
 		cursor.execute(f"""
         	DROP TABLE IF EXISTS {TableName};
-        	CREATE TABLE {TableName} (
+        	CREATE UNLOGGED TABLE {TableName} (
             	Year                INTEGER,
               CensusTract         NUMERIC,
             	State               TEXT,
