@@ -6,6 +6,8 @@ import psycopg2
 import argparse
 import re
 import csv
+import psycopg2.extras
+from itertools import filterfalse
 
 DBname = "data_storage_activity_database"
 DBuser = "jiang6"
@@ -132,7 +134,7 @@ def createTable(conn):
     with conn.cursor() as cursor:
         cursor.execute(f"""
         	DROP TABLE IF EXISTS {TableName};
-        	CREATE TEMP TABLE {TableName} (
+        	CREATE TABLE {TableName} (
             	Year                INTEGER,
               CensusTract         NUMERIC,
             	State               TEXT,
@@ -174,10 +176,62 @@ def createTable(conn):
          	);	
                 ALTER TABLE {TableName} ADD PRIMARY KEY (Year, CensusTract);
          	CREATE INDEX idx_{TableName}_State ON {TableName}(State);
-                CREATE TABLE not_temp (LIKE {TableName} INCLUDING ALL);
     	""")
 
         print(f"Created {TableName}")
+
+def load_batch(conn, icmdlist):
+
+ 	with conn.cursor() as cursor:
+ 		print(f"Loading {len(icmdlist)} rows")
+ 		start = time.perf_counter()
+ 		cmds = [{'Year': Year,**cmd,} for cmd in icmdlist]
+
+ 		psycopg2.extras.execute_batch(cursor, """
+             INSERT INTO CensusData VALUES (
+ 				%(Year)s,
+ 				%(CensusTract)s,
+ 				%(State)s,
+ 				%(County)s,
+ 				%(TotalPop)s,
+ 				%(Men)s,
+ 				%(Women)s,
+ 				%(Hispanic)s,
+ 				%(White)s,
+ 				%(Black)s,
+ 				%(Native)s,
+ 				%(Asian)s,
+ 				%(Pacific)s,
+ 				%(Citizen)s,
+ 				%(Income)s,
+ 				%(IncomeErr)s,
+ 				%(IncomePerCap)s,
+ 				%(IncomePerCapErr)s,
+ 				%(Poverty)s,
+ 				%(ChildPoverty)s,
+ 				%(Professional)s,
+ 				%(Service)s,
+ 				%(Office)s,
+ 				%(Construction)s,
+ 				%(Production)s,
+ 				%(Drive)s,
+ 				%(Carpool)s,
+ 				%(Transit)s,
+ 				%(Walk)s,
+ 				%(OtherTransp)s,
+ 				%(WorkAtHome)s,
+ 				%(MeanCommute)s,
+ 				%(Employed)s,
+ 				%(PrivateWork)s,
+ 				%(PublicWork)s,
+ 				%(SelfEmployed)s,
+ 				%(FamilyWork)s,
+ 				%(Unemployment)s
+             );
+         """, cmds)
+
+ 		elapsed = time.perf_counter() - start
+ 		print(f'Finished Loading. Elapsed Time: {elapsed:0.4} seconds')
 
 
 def load(conn, icmdlist):
@@ -189,7 +243,7 @@ def load(conn, icmdlist):
         for cmd in icmdlist:
             # print (cmd)
             cursor.execute(cmd)
-        cursor.execute(f'INSERT INTO not_temp SELECT * FROM {TableName};')
+        #cursor.execute(f'INSERT INTO not_temp SELECT * FROM {TableName};')
         elapsed = time.perf_counter() - start
         print(f'Finished Loading. Elapsed Time: {elapsed:0.4} seconds')
 
@@ -203,8 +257,8 @@ def main():
     if CreateDB:
         createTable(conn)
 
-    load(conn, cmdlist)
-
+    #load(conn, cmdlist)
+    load_batch(conn,rlis)
 
 if __name__ == "__main__":
     main()
